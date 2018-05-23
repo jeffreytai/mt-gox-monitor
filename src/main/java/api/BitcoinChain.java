@@ -19,11 +19,6 @@ public class BitcoinChain {
     private static final String BALANCE_URL = "https://chain.api.btc.com/v3/address/";
 
     /**
-     * Number of satoshis in one unit
-     */
-    private static final Double SATOSHIS = 100000000.0;
-
-    /**
      * Number of times to retry
      */
     private static int RETRY_LIMIT = 3;
@@ -45,7 +40,7 @@ public class BitcoinChain {
                 AddressResponse response = new Gson().fromJson(json, AddressResponse.class);
 
                 for (AddressData data : response.getData()) {
-                    balances.put(data.getAddress(), data.getBalance() / SATOSHIS);
+                    balances.put(data.getAddress(), ApiHelper.convertSatoshisToBitcoin(data.getBalance()));
                 }
 
                 return balances;

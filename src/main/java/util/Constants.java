@@ -1,22 +1,14 @@
-import api.BitcoinChain;
-import slack.SlackWebhook;
+package util;
 
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
-public class Runner {
-
-    /**
-     * Interval in milliseconds to run process
-     */
-    private static final Long TIME_INTERVAL = 30 * 60 * 1000L;
+public class Constants {
 
     /**
      * List of Mt. Gox bitcoin wallet addresses
      */
-    private static final List<String> mtGoxAddresses = Arrays.asList(
+    public static final List<String> MT_GOX_ADDRESSES = Arrays.asList(
             "12KkeeRkiNS13GMbg7zos9KRn9ggvZtZgx",
             "12T4oSNd4t9ty9fodgNd47TWhK35pAxDYN",
             "13ahgw8sM95EDbugT3tdb8TYoMU46Uw7PX",
@@ -98,57 +90,4 @@ public class Runner {
             "1PRXQEoL8vzEzoJJ9hbtAP6NaV2daccAUn",
             "1PxGTuJzDx1ceFHx4Z5CHaWuhiPBNovmZD"
     );
-
-    /**
-     * Mt Gox wallet balances
-     */
-    private static Map<String, Double> existingBalances = new HashMap<String, Double>();
-
-    /**
-     * Empty constructor
-     */
-    public Runner() {}
-
-    /**
-     * Initialize balances with the current state
-     */
-    public void initialize() {
-        existingBalances = BitcoinChain.getBalances(mtGoxAddresses);
-    }
-
-    /**
-     * Compare current and previous values, monitor changes
-     */
-    public void run() {
-        SlackWebhook slack = new SlackWebhook("mt-gox-movement");
-
-        try {
-            while (true) {
-                Map<String, Double> currentBalances = BitcoinChain.getBalances(mtGoxAddresses);
-
-                for (Map.Entry<String, Double> entry : currentBalances.entrySet()) {
-                    String address = entry.getKey();
-                    Double currentBalance = entry.getValue();
-
-                    Double existingBalance = existingBalances.get(address);
-                    if (!existingBalance.equals(currentBalance)) {
-                        /**
-                         * Send slack alert regarding change
-                         */
-                        String message = String.format("Movement at address %s: from %s BTC to %s BTC", address, existingBalance.toString(), currentBalance.toString());
-                        slack.sendMessage(message);
-
-                        existingBalances.put(address, currentBalance);
-                    }
-                }
-
-                System.out.println("sleeping...");
-                Thread.sleep(TIME_INTERVAL);
-            }
-        } catch (InterruptedException ex) {
-            slack.sendMessage("Error: " + ex.toString());
-        }
-
-        slack.shutdown();
-    }
 }

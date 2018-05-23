@@ -2,8 +2,11 @@ public class Main {
 
     public static void main(String[] args) {
 
-        Runner runner = new Runner();
-        runner.initialize();
-        runner.run();
+//        Monitor monitor = new Monitor();
+//        monitor.initialize();
+//        monitor.run();
+
+        History history = new History();
+        history.analyze();
     }
 }
