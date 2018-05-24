@@ -16,6 +16,9 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import static java.util.stream.Collectors.toList;
 
 public class History {
 
@@ -39,6 +42,11 @@ public class History {
      */
     private static final String COINDESK_PRICE_URL = "https://api.coindesk.com/v1/bpi/historical/close.json?";
 
+    /**
+     * Transaction was relayed by this node
+     */
+    private static final String SELF_RELAYED = "0.0.0.0";
+
     private Gson gson;
 
     public History() {
@@ -56,17 +64,36 @@ public class History {
                 RawAddressResponse response = gson.fromJson(json, RawAddressResponse.class);
 
                 /**
+                 * The bitcoin network doesn't store an actual timestamp for each transaction due to its nature of decentralization.
+                 * A workaround is to find the transaction that was relayed by the Blockchain Info node
+                 * and find the timestamp accordingly, which is the time that the specific node was made aware of the tx
+                 */
+                List<RawAddressTransactions> selfTransactions = response.getTransactions()
+                        .stream()
+                        .filter(t -> t.getRelayedBy().equals(SELF_RELAYED))
+                        .collect(toList());
+
+                if (selfTransactions.size() == 0) continue;
+
+                Long transactionTimestamp = selfTransactions.iterator()
+                        .next()
+                        .getTime();
+
+                /**
                  * Filter transactions to only those sent by the respective address and that meet the minimum threshold
+                 * For duplicate block heights, merge the transactions
                  */
                 Map<Long, List<RawOut>> transactionTimeMap = response.getTransactions()
                         .stream()
                         .collect(Collectors.toMap(
-                                RawAddressTransactions::getTime,
+                                t -> t.getBlockHeight(),
                                 t -> t.getOut()
                                         .stream()
                                         .filter(o -> ApiHelper.convertSatoshisToBitcoin(o.getValue()) > MINIMUM_BITCOIN_THRESHOLD)
                                         .filter(o -> o.getAddress().equals(mtGoxAddress))
-                                        .collect(Collectors.toList())));
+                                        .collect(toList()),
+                                (txList1, txList2) -> Stream.concat(txList1.stream(), txList2.stream())
+                                        .collect(toList())));
 
                 /**
                  * Remove transactions that don't meet the criteria
@@ -74,7 +101,7 @@ public class History {
                 Map<Long, List<RawOut>> validTransactionTimeMap = transactionTimeMap.entrySet()
                         .stream()
                         .filter(kv -> kv.getValue().size() > 0)
-                        .collect(Collectors.toMap(entry -> entry.getKey(), entry -> entry.getValue()));
+                        .collect(Collectors.toMap(entry -> transactionTimestamp, entry -> entry.getValue()));
 
                 /**
                  * For each valid transaction, check the prices for each of the following 10 days
@@ -88,8 +115,6 @@ public class History {
 
                     /**
                      * Find start period and end period (add 10 days)
-                     *
-                     * TODO: Use the correct timestamp, this is current the wallet creation date
                      */
                     DateTime datetime = TimeHelper.convertUnixTimestampToDateTime(transactionTimeEntry.getKey());
                     String startPeriod = TimeHelper.extractDate(datetime);
@@ -126,7 +151,6 @@ public class History {
         for (Triplet<String, Double, Map<String, Double>> tx : transactionImpact) {
             System.out.println(tx);
         }
-//        System.out.println("transactionImpact: " + transactionImpact);
 
     }
 }
